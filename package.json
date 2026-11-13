@@ -1,0 +1,40 @@
+{
+  "name": "@rango-dev/cli",
+  "version": "0.1.0",
+  "description": "CLI for the Rango Exchange cross-chain swap & bridge aggregation API",
+  "homepage": "https://github.com/Anttarress/rango-cli",
+  "bugs": { "url": "https://github.com/Anttarress/rango-cli/issues" },
+  "repository": { "type": "git", "url": "https://github.com/Anttarress/rango-cli.git" },
+  "license": "MIT",
+  "author": "Rango Exchange",
+  "keywords": ["rango", "cli", "bridge", "dex", "cross-chain", "aggregator", "swap", "defi", "agent"],
+  "type": "module",
+  "bin": { "rango": "./dist/rango.js" },
+  "files": ["dist"],
+  "engines": { "node": ">=20" },
+  "publishConfig": { "access": "public", "provenance": true },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "start": "node dist/rango.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "format": "biome format --write src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm build"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+    "commander": "^14.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.11",
+    "@types/node": "^22.0.0",
+    "tsdown": "^0.21.8",
+    "typescript": "~5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
