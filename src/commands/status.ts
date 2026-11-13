@@ -71,7 +71,7 @@ Examples:
             last = await fetchStatus();
             const status = (last.status ?? "").toLowerCase();
             if (TERMINAL_STATUSES.has(status)) break;
-            if ((Date.now() - started) / 1000 > timeout) {
+            if ((Date.now() - started) / 1000 >= timeout) {
               throw new CliError(
                 `Still ${status || "pending"} after ${timeout}s`,
                 ExitCode.General,

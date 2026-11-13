@@ -289,7 +289,7 @@ describe("status and approval", () => {
     mockFetch({ "/basic/status": { status: "running" } });
     const r = await run(["status", "req", "0xhash", "--watch", "--interval", "0.001", "--timeout", "0"]);
     expect(r.code).toBe(1);
-    expect(JSON.parse(r.stderr).message).toMatch(/Still running/);
+    expect(JSON.parse(r.stderr.split("\n").pop() ?? "").message).toMatch(/Still running/);
   });
   it("approval exits 1 while not yet approved", async () => {
     mockFetch({ "/basic/is-approved": { isApproved: false, txStatus: "running" } });
