@@ -1,11 +1,15 @@
 import { Command } from "commander";
+import { registerAgentCommand } from "../commands/agent.js";
 import { registerApiCommand } from "../commands/api.js";
 import { registerAuthCommand } from "../commands/auth.js";
 import { registerBalanceCommand } from "../commands/balance.js";
 import { registerChainsCommand } from "../commands/chains.js";
+import { registerGeneratedCommands } from "../commands/generated.js";
 import { registerHealthCommand } from "../commands/health.js";
+import { registerMcpCommand } from "../commands/mcp.js";
 import { registerQuoteCommand } from "../commands/quote.js";
 import { registerReportCommand } from "../commands/report.js";
+import { registerRouteCommand } from "../commands/route.js";
 import { registerStatusCommand } from "../commands/status.js";
 import { registerSwapCommand } from "../commands/swap.js";
 import { registerSwappersCommand } from "../commands/swappers.js";
@@ -24,7 +28,10 @@ Agent guidance:
   Assets are BLOCKCHAIN.SYMBOL or BLOCKCHAIN.SYMBOL--ADDRESS; "rango chains" and "rango tokens" list them.
   --amount takes the smallest unit as an integer, or a decimal that is converted using the token's decimals.
   Nothing here signs or sends a transaction: "rango swap" returns calldata for a wallet.
-  "rango api <path>" reaches any endpoint the commands do not cover.
+  Every API operation is also "rango basic <op>" or "rango main <op>"; "rango map" lists them,
+  "rango schema <surface> <op>" prints the input schema. "rango api <path>" reaches anything else.
+  "rango mcp" serves the same operations as MCP tools; "rango agent setup" wires them into
+  Claude Code, Cursor or Codex.
 
 Docs: ${DOCS_URL}   Keys: ${DISCORD_URL}   Source: ${REPO_URL}`;
 
@@ -33,7 +40,9 @@ export function createProgram(): Command {
 
   program
     .name(CLI_NAME)
-    .description("Rango Exchange from the terminal: cross-chain quotes, swaps, status and metadata")
+    .description(
+      "Rango Exchange from the terminal: cross-chain quotes, swaps, status, metadata, and an MCP server",
+    )
     .version(VERSION, "-v, --version")
     .option("--json", "Print JSON even on a terminal")
     .option("--compact", "Single-line JSON (implies --json)")
@@ -57,12 +66,16 @@ export function createProgram(): Command {
   registerTokensCommand(program);
   registerSwappersCommand(program);
   registerQuoteCommand(program);
+  registerRouteCommand(program);
   registerSwapCommand(program);
   registerStatusCommand(program);
   registerBalanceCommand(program);
   registerReportCommand(program);
   registerHealthCommand(program);
   registerApiCommand(program);
+  registerMcpCommand(program);
+  registerAgentCommand(program);
+  registerGeneratedCommands(program);
 
   return program;
 }

@@ -48,6 +48,11 @@ not `https`.
 | `rango balance <chain> <address> [--token X]` | Wallet balances |
 | `rango report <requestId> --event USER_REJECT` | Tell Rango a wallet rejected or failed |
 | `rango health` | API reachable, key accepted, latency |
+| `rango route --from-chain A --to-chain B --amount N` | Best multi-step route (Main API) with its steps |
+| `rango basic <op>` / `rango main <op>` | Every API operation, flags generated from its schema (29 in all) |
+| `rango schema <surface> <op>` / `rango map` | An operation's input schema; every command and tool |
+| `rango mcp` | Serve the same 29 operations as MCP tools over stdio |
+| `rango agent setup` | Wire the MCP server and the Rango skill into Claude Code, Cursor or Codex |
 | `rango api <path> [-p k=v] [-d json]` | Any other endpoint, key attached, JSON out |
 
 `rango <command> --help` shows every flag with examples.
@@ -77,6 +82,44 @@ rango status <requestId> <txHash> --watch
 `rango swap` shows the recipient address in bold before anything else. Check it. A swap
 cannot be reversed once signed.
 
+## Multi-step routes (Main API)
+
+When no single swapper connects two assets, the Main API chains several. Amounts
+here are human-readable decimals, not the smallest unit.
+
+```bash
+rango route --from-chain ETH --from-token USDC --to-chain OSMOSIS --to-token OSMO \
+            --amount 100 --wallets '{"ETH":"0x…","OSMOSIS":"osmo1…"}'
+rango main confirm-route --request-id <id> --selected-wallets '{"ETH":"0x…","OSMOSIS":"osmo1…"}'
+rango main create-tx --request-id <id> --step 1          # sign, then
+rango main check-tx-status --request-id <id> --tx-id <hash> --step 1
+```
+
+## MCP server and agent setup
+
+The CLI doubles as an MCP server. `rango mcp` serves every operation in the
+catalogue as a tool over stdio, with `readOnlyHint` set honestly: `basic_swap`
+and `main_create_tx` build calldata, nothing signs. One command configures the
+agents on your machine:
+
+```bash
+rango agent setup --status      # what is detected and configured
+rango agent setup -y            # Claude Code, Cursor, Codex: MCP server + skill
+```
+
+Claude Code gets `claude mcp add --scope user rango -- rango mcp` and the skill in
+`~/.claude/skills/rango`; Cursor gets an entry merged into `~/.cursor/mcp.json`;
+Codex gets `[mcp_servers.rango]` appended to `~/.codex/config.toml`. The API key is
+never written into an agent's config: `rango mcp` reads it the same way every
+command does. Any other MCP client:
+
+```json
+{ "mcpServers": { "rango": { "command": "rango", "args": ["mcp"] } } }
+```
+
+The skill itself lives at [skills/rango/SKILL.md](skills/rango/SKILL.md) and also
+installs with `npx skills add Anttarress/rango-cli`.
+
 ## Scripting and agents
 
 - **JSON when piped.** Any command prints JSON when stdout is not a terminal; `--json` forces
@@ -85,12 +128,12 @@ cannot be reversed once signed.
 - **Exit codes:** `0` ok, `1` general, `2` bad arguments, `3` key missing or rejected,
   `4` API error (no route, input limits, server), `5` network error.
 - **No prompts** when stdin is not a terminal, or with `--no-input`: a missing flag is exit 2.
-- **`rango api`** reaches the multi-step routing API (`/routing/*`, `/tx/*`) and the
-  explorer (`/scanner/*`) that the curated commands do not wrap.
+- **Every operation has a command.** `rango basic <op>` and `rango main <op>` are
+  generated from one catalogue, the same one `rango mcp` serves; `rango schema` prints
+  an operation's input schema and `rango map` lists them all. `rango api` reaches
+  anything else, such as the explorer (`/scanner/*`).
 - `rango --help` ends with an agent-guidance block that says all of the above.
 
-A companion [MCP server](https://github.com/rango-exchange/rango-mcp) exposes the same API
-as tools for agents inside MCP-capable hosts.
 
 ## Global options
 

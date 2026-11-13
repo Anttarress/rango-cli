@@ -3,16 +3,40 @@
   "version": "0.1.0",
   "description": "CLI for the Rango Exchange cross-chain swap & bridge aggregation API",
   "homepage": "https://github.com/Anttarress/rango-cli",
-  "bugs": { "url": "https://github.com/Anttarress/rango-cli/issues" },
-  "repository": { "type": "git", "url": "https://github.com/Anttarress/rango-cli.git" },
+  "bugs": {
+    "url": "https://github.com/Anttarress/rango-cli/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Anttarress/rango-cli.git"
+  },
   "license": "MIT",
   "author": "Rango Exchange",
-  "keywords": ["rango", "cli", "bridge", "dex", "cross-chain", "aggregator", "swap", "defi", "agent"],
+  "keywords": [
+    "rango",
+    "cli",
+    "bridge",
+    "dex",
+    "cross-chain",
+    "aggregator",
+    "swap",
+    "defi",
+    "agent"
+  ],
   "type": "module",
-  "bin": { "rango": "./dist/rango.js" },
-  "files": ["dist"],
-  "engines": { "node": ">=20" },
-  "publishConfig": { "access": "public", "provenance": true },
+  "bin": {
+    "rango": "./dist/rango.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
@@ -28,7 +52,9 @@
   },
   "packageManager": "pnpm@10.33.0",
   "dependencies": {
-    "commander": "^14.0.0"
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "commander": "^14.0.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.11",

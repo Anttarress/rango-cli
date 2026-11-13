@@ -11,3 +11,10 @@ First release.
 - Decimal amounts converted through token metadata.
 - Key from `--api-key`, `RANGO_API_KEY`, or `rango auth set`.
 - Never signs or broadcasts.
+- Main API: `route`, and `rango main <op>` for all 16 operations (best routes, confirm,
+  per-step transactions, balances).
+- One operation catalogue drives `rango basic|main <op>`, `rango schema`, `rango map`
+  and the MCP server.
+- `rango mcp`: the 29 operations as MCP tools over stdio.
+- `rango agent setup`: configures Claude Code, Cursor and Codex with the MCP server and
+  the bundled skill (`skills/rango/SKILL.md`).

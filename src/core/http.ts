@@ -3,7 +3,7 @@ import { ExitCode, REQUEST_TIMEOUT_MS, VERSION } from "./constants.js";
 import { CliError, mapHttpError, mapNetworkError } from "./errors.js";
 import { debug } from "./output.js";
 
-export type ParamValue = string | number | boolean | null | undefined;
+export type ParamValue = string | number | boolean | null | undefined | string[];
 export type Params = Record<string, ParamValue>;
 
 export interface RequestOptions {
@@ -19,6 +19,10 @@ function buildUrl(path: string, params: Params | undefined, auth: boolean): URL 
   const url = new URL(`${base}${path.startsWith("/") ? path : `/${path}`}`);
   for (const [name, value] of Object.entries(params ?? {})) {
     if (value === undefined || value === null || value === "") continue;
+    if (Array.isArray(value)) {
+      for (const item of value) url.searchParams.append(name, String(item));
+      continue;
+    }
     url.searchParams.set(name, String(value));
   }
   if (auth) {
