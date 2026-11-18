@@ -11,10 +11,10 @@ subprocess: tables on a TTY, JSON when piped, stable exit codes, one dependency.
 ```bash
 npm install -g @rango-dev/cli
 rango auth set <your-api-key>
-rango quote --from BSC.BNB --to ETH.USDC--0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 --amount 0.1
+rango basic quote --from BSC.BNB --to ETH.USDC--0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 --amount 100000000000000000
 ```
 
-Or without installing: `npx @rango-dev/cli chains`.
+Or without installing: `npx @rango-dev/cli basic chains`.
 
 ## API key
 
@@ -23,73 +23,84 @@ Every endpoint needs a key, issued by the Rango team on
 highest priority first:
 
 ```bash
-rango chains --api-key <key>        # this run only
+rango basic chains --api-key <key>  # this run only
 export RANGO_API_KEY=<key>          # this shell
 rango auth set <key>                # stored in ~/.config/rango/config.json, mode 600
 ```
 
-`rango auth show` tells you which one is in use. `rango auth test` makes one request to
-check it. The key travels as a query parameter, so the CLI refuses any API URL that is
-not `https`.
+### Is a key configured?
+
+```bash
+rango auth show   # Prints the source (env / config / flag) and a masked key, or "(not set)".
+rango auth test   # Makes one cheap request; reports blockchains visible, latency, and the API URL.
+```
+
+`auth show` only inspects local state — it never leaves the machine. `auth test` actually hits
+the API, so it's the one to use when you want to verify that the key is accepted. It exits 3 if
+no key is configured or the API rejects it. Scripts can parse `rango auth show --json`:
+
+```bash
+if [ "$(rango auth show --json | jq -r .configured)" != "true" ]; then
+  echo "Set a key with: rango auth set <key>"
+fi
+```
+
+The key travels as a query parameter, so the CLI refuses any API URL that is not `https`.
 
 ## Commands
 
+The CLI is two surfaces — `rango basic <op>` for single-step swaps and
+`rango main <op>` for multi-step routing — plus a handful of infrastructure commands.
+
 | Command | What it does |
 |---|---|
-| `rango chains [--type EVM] [--all]` | Every supported blockchain |
-| `rango chain <name>` | One chain: address patterns, fee assets, explorer |
-| `rango tokens <chain> [--search txt] [--popular]` | Tokens on one chain, with decimals and addresses |
+| `rango basic <op>` | Single-step swaps: `quote`, `swap`, `status`, `check-approval`, `balance`, `token-balance`, `chains`, `swappers`, `meta`, `messaging-protocols`, `custom-token`, `connected-assets`, `report-tx` (13 ops) |
+| `rango main <op>` | Multi-step routing: `best-route`, `best-routes`, `confirm-route`, `create-tx`, `check-tx-status`, `check-approval`, `meta`, `compact-meta`, `blockchains`, `swappers`, `custom-token`, `contracts`, `token-balance`, `multiple-token-balance`, `report-tx` (15 ops) |
 | `rango token <chain> <symbol\|address>` | One token; falls back to the custom-token endpoint |
-| `rango swappers [--type BRIDGE]` | DEXs, bridges and aggregators Rango routes through |
-| `rango quote --from A --to B --amount N` | Best route, output, fees, ETA, and a `requestId` |
-| `rango swap … --from-address 0x…` | The unsigned transaction (plus approval if needed) |
-| `rango status <requestId> <txHash> [--watch]` | Track a swap until `success` or `failed` |
-| `rango approval <requestId> <txHash>` | Has an approval transaction confirmed? |
-| `rango balance <chain> <address> [--token X]` | Wallet balances |
-| `rango report <requestId> --event USER_REJECT` | Tell Rango a wallet rejected or failed |
-| `rango health` | API reachable, key accepted, latency |
-| `rango route --from-chain A --to-chain B --amount N` | Best multi-step route (Main API) with its steps |
-| `rango basic <op>` / `rango main <op>` | Every API operation, flags generated from its schema (29 in all) |
 | `rango schema <surface> <op>` / `rango map` | An operation's input schema; every command and tool |
-| `rango mcp` | Serve the same 29 operations as MCP tools over stdio |
+| `rango mcp` | Serve the operations as MCP tools over stdio |
 | `rango agent setup` | Wire the MCP server and the Rango skill into Claude Code, Cursor or Codex |
 | `rango api <path> [-p k=v] [-d json]` | Any other endpoint, key attached, JSON out |
+| `rango auth` | Manage the API key |
 
 `rango <command> --help` shows every flag with examples.
 
 ### Assets and amounts
 
 Assets use Rango's notation: `BLOCKCHAIN.SYMBOL` for native coins, `BLOCKCHAIN.SYMBOL--ADDRESS`
-for tokens. `rango chains` gives the blockchain names (`BSC`, `ETH`, `ARBITRUM`,
-`AVAX_CCHAIN`, `SOLANA`, …) and `rango tokens <chain>` gives symbols, addresses and decimals.
+for tokens. `rango basic chains` gives the blockchain names (`BSC`, `ETH`, `ARBITRUM`,
+`AVAX_CCHAIN`, `SOLANA`, …) and `rango token <chain> <symbol>` resolves one token to its
+address and decimals.
 
-`--amount` accepts the token's smallest unit as an integer (`1000000` for 1 USDC) or a
-decimal (`1.5`), which the CLI converts using the token's decimals from Rango's metadata.
+Amounts differ by surface:
+- **Basic:** smallest unit as an integer string (`1000000` for 1 USDC).
+- **Main:** human-readable decimal string (`"1.5"`). Mixing them is the most common mistake.
 
-### The swap flow
+### Single-step flow (Basic)
 
 ```bash
-rango quote --from BSC.BNB --to ETH.USDC--0xa0b8… --amount 0.1          # 1. is there a route?
-rango swap  --from BSC.BNB --to ETH.USDC--0xa0b8… --amount 0.1 \
-            --from-address 0xYOU --json > tx.json                     # 2. unsigned tx
+rango basic quote --from BSC.BNB --to ETH.USDC--0xa0b8… --amount 100000000000000000   # 1. is there a route?
+rango basic swap  --from BSC.BNB --to ETH.USDC--0xa0b8… --amount 100000000000000000 \
+                  --from-address 0xYOU --to-address 0xYOU --slippage 0.5 > tx.json    # 2. unsigned tx
 # 3. sign tx.json's "tx" with your wallet. If it carries approveTo/approveData,
 #    sign that first and wait for:
-rango approval <requestId> <approveTxHash>
+rango basic check-approval --request-id <id> --tx-id <approveTxHash>
 # 4. then run swap again and sign the main transaction. Track it:
-rango status <requestId> <txHash> --watch
+rango basic status --request-id <id> --tx-id <txHash>
 ```
 
-`rango swap` shows the recipient address in bold before anything else. Check it. A swap
-cannot be reversed once signed.
+Nothing in the CLI signs or broadcasts; `rango basic swap` returns calldata for a wallet.
+**Check the `toAddress` before signing — a swap cannot be reversed.**
 
-## Multi-step routes (Main API)
+### Multi-step flow (Main)
 
-When no single swapper connects two assets, the Main API chains several. Amounts
-here are human-readable decimals, not the smallest unit.
+When no single swapper connects two assets, the Main API chains several. Amounts are
+human-readable decimals, not the smallest unit.
 
 ```bash
-rango route --from-chain ETH --from-token USDC --to-chain OSMOSIS --to-token OSMO \
-            --amount 100 --wallets '{"ETH":"0x…","OSMOSIS":"osmo1…"}'
+rango main best-route --from-blockchain ETH --from-symbol USDC \
+                      --to-blockchain OSMOSIS --to-symbol OSMO --amount 100 \
+                      --selected-wallets '{"ETH":"0x…","OSMOSIS":"osmo1…"}'
 rango main confirm-route --request-id <id> --selected-wallets '{"ETH":"0x…","OSMOSIS":"osmo1…"}'
 rango main create-tx --request-id <id> --step 1          # sign, then
 rango main check-tx-status --request-id <id> --tx-id <hash> --step 1
@@ -123,7 +134,7 @@ installs with `npx skills add Anttarress/rango-cli`.
 ## Scripting and agents
 
 - **JSON when piped.** Any command prints JSON when stdout is not a terminal; `--json` forces
-  it and `--compact` puts it on one line. `rango chains | jq '.[].name'` just works.
+  it and `--compact` puts it on one line. `rango basic chains | jq '.[].name'` just works.
 - **Errors on stderr**, as JSON in JSON mode, never mixed into stdout.
 - **Exit codes:** `0` ok, `1` general, `2` bad arguments, `3` key missing or rejected,
   `4` API error (no route, input limits, server), `5` network error.

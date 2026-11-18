@@ -109,4 +109,31 @@ describe("agent setup", () => {
       /claude mcp add --scope user rango -- npx -y @rango-dev\/cli mcp/,
     );
   });
+
+  it("accepts multiple --client values both comma-separated and repeated", async () => {
+    mkdirSync(join(home, ".cursor"));
+    mkdirSync(join(home, ".codex"));
+    const comma = await run(["agent", "setup", "--client", "cursor,codex", "-y", "--mcp-only"]);
+    expect(comma.code).toBe(0);
+    const touched = JSON.parse(comma.stdout)
+      .results.map((r: { client: string }) => r.client)
+      .sort();
+    expect(touched).toEqual(["codex", "cursor"]);
+
+    const repeated = await run([
+      "agent",
+      "setup",
+      "--client",
+      "cursor",
+      "--client",
+      "codex",
+      "-y",
+      "--mcp-only",
+    ]);
+    expect(repeated.code).toBe(0);
+
+    const bad = await run(["agent", "setup", "--client", "cursor,nope", "-y"]);
+    expect(bad.code).not.toBe(0);
+    expect(bad.stderr).toMatch(/Unknown --client/);
+  });
 });

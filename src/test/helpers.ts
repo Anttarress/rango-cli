@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { vi } from "vitest";
-import { createProgram } from "../bin/rango.js";
+import { createProgram, normalizeHelpArg } from "../bin/rango.js";
 
 export class ExitSignal extends Error {
   constructor(public readonly code: number) {
@@ -84,7 +84,7 @@ export async function run(args: string[], opts: { tty?: boolean } = {}): Promise
       for (const sub of cmd.commands) configure(sub);
     };
     configure(program);
-    await program.parseAsync(["node", "rango", ...args]);
+    await program.parseAsync(normalizeHelpArg(["node", "rango", ...args], program));
     code = typeof process.exitCode === "number" ? process.exitCode : 0;
   } catch (error) {
     if (error instanceof ExitSignal) code = error.code;

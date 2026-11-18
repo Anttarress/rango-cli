@@ -12,8 +12,9 @@ import {
 import { ExitCode } from "../core/constants.js";
 import { CliError } from "../core/errors.js";
 import { keyValue } from "../core/format.js";
+import { api } from "../core/http.js";
 import { isJsonMode, print, printJson } from "../core/output.js";
-import { fetchChains } from "./chains.js";
+import type { Blockchain } from "../types/index.js";
 
 export function registerAuthCommand(program: Command): void {
   const auth = program.command("auth").description("Manage the API key: show, test, set, unset");
@@ -45,7 +46,7 @@ export function registerAuthCommand(program: Command): void {
 
   auth
     .command("test")
-    .description("Make one cheap request to verify the key is accepted")
+    .description("Make one cheap request to verify the key is accepted and measure latency")
     .action(
       action(async () => {
         if (!resolveApiKey()) {
@@ -55,9 +56,12 @@ export function registerAuthCommand(program: Command): void {
             "Set RANGO_API_KEY, pass --api-key, or run: rango auth set <key>",
           );
         }
-        const chains = await fetchChains();
-        if (isJsonMode()) return printJson({ ok: true, blockchains: chains.length });
-        print(`API key accepted (${chains.length} blockchains visible)`);
+        const started = Date.now();
+        const chains = await api.get<Blockchain[]>("/basic/meta/blockchains");
+        const latencyMs = Date.now() - started;
+        const count = Array.isArray(chains) ? chains.length : 0;
+        if (isJsonMode()) return printJson({ ok: true, blockchains: count, latencyMs, apiUrl: getApiUrl() });
+        print(`API key accepted (${count} blockchains visible in ${latencyMs} ms via ${getApiUrl()})`);
       }),
     );
 

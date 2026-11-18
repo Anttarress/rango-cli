@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type Command, Option } from "commander";
+import { type Command, InvalidArgumentError, Option } from "commander";
 import { action } from "../core/command.js";
 import { ExitCode } from "../core/constants.js";
 import { CliError, invalidArgs } from "../core/errors.js";
@@ -217,10 +217,29 @@ export function registerAgentCommand(program: Command): void {
     .command("agent")
     .description("Set up AI coding agents with the Rango MCP server and skill");
 
+  const clientIds = CLIENTS.map((c) => c.id);
+  const parseClientList = (value: string, previous: ClientId[] | undefined): ClientId[] => {
+    const parts = value
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    const invalid = parts.filter((p) => !clientIds.includes(p as ClientId));
+    if (invalid.length > 0) {
+      throw new InvalidArgumentError(
+        `Unknown --client value(s): ${invalid.join(", ")}. Allowed: ${clientIds.join(", ")}`,
+      );
+    }
+    return [...(previous ?? []), ...(parts as ClientId[])];
+  };
+
   agent
     .command("setup")
     .description("Detect Claude Code, Cursor and Codex and give each the Rango MCP server and skill")
-    .addOption(new Option("--client <id>", "Only this agent").choices(CLIENTS.map((c) => c.id)))
+    .option(
+      "--client <ids>",
+      `Limit to these agents (repeatable or comma-separated: ${clientIds.join(", ")})`,
+      parseClientList,
+    )
     .addOption(
       new Option("--scope <scope>", "Where the skill goes: the agent's home directory or this project")
         .choices(["global", "local"])
@@ -237,6 +256,8 @@ Examples:
   $ rango agent setup --status
   $ rango agent setup -y
   $ rango agent setup --client cursor --skills-only --scope local
+  $ rango agent setup --client claude-code,cursor -y
+  $ rango agent setup --client claude-code --client codex -y
 
 What it writes:
   Claude Code  claude mcp add --scope user rango -- rango mcp ; ~/.claude/skills/rango/SKILL.md
@@ -247,14 +268,14 @@ The API key is never written into an agent's config: rango mcp reads it like eve
     .action(
       action(
         async (options: {
-          client?: ClientId;
+          client?: ClientId[];
           scope: Scope;
           status?: boolean;
           skillsOnly?: boolean;
           mcpOnly?: boolean;
           yes?: boolean;
         }) => {
-          const targets = CLIENTS.filter((c) => (options.client ? c.id === options.client : detect(c)));
+          const targets = CLIENTS.filter((c) => (options.client ? options.client.includes(c.id) : detect(c)));
           if (options.status) {
             const report = CLIENTS.map((c) => ({
               client: c.id,

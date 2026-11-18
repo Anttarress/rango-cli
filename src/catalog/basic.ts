@@ -108,7 +108,7 @@ export const basicOperations = [
     name: "swap",
     summary: "Build the unsigned transaction for a swap",
     description:
-      "Returns tx for the wallet to sign; nothing is signed or sent here. If tx carries approveTo/approveData, sign that first, wait for is-approved, then call again. Show the user toAddress, amount and outputAmountMin before they sign.",
+      "Returns tx for the wallet to sign; nothing is signed or sent here. If tx carries approveTo/approveData, sign that first, wait for check-approval, then call again. Show the user toAddress, amount and outputAmountMin before they sign.",
     readOnly: false,
     input: z.object({
       from: assetFrom,
@@ -140,7 +140,7 @@ export const basicOperations = [
   }),
   defineOperation({
     surface: "basic",
-    name: "is-approved",
+    name: "check-approval",
     summary: "Whether an approval transaction has confirmed",
     description: "Returns isApproved, txStatus, requiredApprovedAmount and currentApprovedAmount.",
     readOnly: true,

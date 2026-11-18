@@ -8,10 +8,10 @@ const op = (surface: string, name: string) => {
 };
 
 describe("catalogue", () => {
-  it("has 29 operations with unique names and tool names", () => {
-    expect(operations).toHaveLength(29);
-    expect(new Set(operations.map((o) => `${o.surface}/${o.name}`)).size).toBe(29);
-    expect(new Set(operations.map(toolName)).size).toBe(29);
+  it("has 28 operations with unique names and tool names", () => {
+    expect(operations).toHaveLength(28);
+    expect(new Set(operations.map((o) => `${o.surface}/${o.name}`)).size).toBe(28);
+    expect(new Set(operations.map(toolName)).size).toBe(28);
     expect(toolName(op("main", "best-route"))).toBe("main_best_route");
     for (const o of operations) {
       expect(o.summary.length).toBeGreaterThan(5);
@@ -104,18 +104,13 @@ describe("catalogue", () => {
     expect(() => o.input.parse({ requestId: "r", step: 0 })).toThrow();
   });
 
-  it("main check-approval puts the requestId in the path and wallet-details repeats address", () => {
+  it("main check-approval puts the requestId in the path", () => {
     const approval = op("main", "check-approval");
     expect(approval.request(approval.input.parse({ requestId: "a/b", txId: "0x1" }))).toEqual({
       method: "GET",
       path: "/tx/a%2Fb/check-approval",
       params: { txId: "0x1" },
     });
-    const wallets = op("main", "wallet-details");
-    expect(wallets.request(wallets.input.parse({ addresses: ["ETH.0x1", "BSC.0x2"] })).params).toEqual({
-      address: ["ETH.0x1", "BSC.0x2"],
-    });
-    expect(() => wallets.input.parse({ addresses: [] })).toThrow();
   });
 
   it("meta filters become comma-separated query params on both surfaces", () => {

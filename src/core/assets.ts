@@ -37,8 +37,9 @@ export function isIntegerAmount(amount: string): boolean {
   return /^\d+$/.test(amount.trim());
 }
 
-export async function fetchTokens(blockchain: string): Promise<Token[]> {
-  const meta = await api.get<MetaResponse>("/basic/meta", { params: { blockchains: blockchain } });
+export async function fetchTokens(blockchain: string, surface: "basic" | "main" = "basic"): Promise<Token[]> {
+  const path = surface === "main" ? "/meta" : "/basic/meta";
+  const meta = await api.get<MetaResponse>(path, { params: { blockchains: blockchain } });
   return meta.tokens ?? [];
 }
 

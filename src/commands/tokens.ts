@@ -7,41 +7,25 @@ import { api } from "../core/http.js";
 import { isJsonMode, print, printJson } from "../core/output.js";
 import type { CustomTokenResponse, Token } from "../types/index.js";
 
-const TABLE_LIMIT = 100;
+type Surface = "basic" | "main";
 
-function tokenRow(t: Token) {
-  return {
-    symbol: t.symbol,
-    name: t.name,
-    address: t.address ?? "(native)",
-    decimals: t.decimals,
-    usdPrice: t.usdPrice,
-    popular: t.isPopular,
-  };
-}
+const customTokenPath = (surface: Surface) =>
+  surface === "main" ? "/meta/custom-token" : "/basic/meta/custom-token";
 
-export function registerTokensCommand(program: Command): void {
-  program
+function registerTokensSubcommand(group: Command, surface: Surface): void {
+  group
     .command("tokens <chain>")
     .description("Tokens Rango knows on one blockchain")
     .option("--search <text>", "Only tokens whose symbol or name contains this text")
     .option("--popular", "Only tokens Rango marks as popular")
-    .option(
-      "--limit <n>",
-      `Rows to show in table mode (default ${TABLE_LIMIT}; JSON output is never limited)`,
-    )
     .addHelpText(
       "after",
-      `
-Examples:
-  $ rango tokens ETH --search usdc
-  $ rango tokens ARBITRUM --popular
-  $ rango tokens BSC --json | jq '.[] | select(.symbol=="USDT") | .address'`,
+      `\nExamples:\n  $ rango ${surface} tokens ETH --search usdc\n  $ rango ${surface} tokens BSC --popular --json`,
     )
     .action(
-      action(async (chain: string, options: { search?: string; popular?: boolean; limit?: string }) => {
+      action(async (chain: string, options: { search?: string; popular?: boolean }) => {
         const blockchain = chain.toUpperCase();
-        let tokens = await fetchTokens(blockchain);
+        let tokens = await fetchTokens(blockchain, surface);
         if (options.search) {
           const needle = options.search.toLowerCase();
           tokens = tokens.filter(
@@ -52,24 +36,31 @@ Examples:
         }
         if (options.popular) tokens = tokens.filter((t) => t.isPopular);
         if (isJsonMode()) return printJson(tokens);
-        const limit = options.limit ? Number(options.limit) : TABLE_LIMIT;
-        const shown = tokens.slice(0, limit);
         print(
-          recordsTable(shown.map(tokenRow), ["symbol", "name", "address", "decimals", "usdPrice", "popular"]),
+          recordsTable(
+            tokens.map((t: Token) => ({
+              symbol: t.symbol,
+              name: t.name,
+              address: t.address ?? "(native)",
+              decimals: t.decimals,
+              usdPrice: t.usdPrice,
+              popular: t.isPopular,
+            })),
+            ["symbol", "name", "address", "decimals", "usdPrice", "popular"],
+          ),
         );
-        const more = tokens.length - shown.length;
-        print(
-          `\n${tokens.length} tokens on ${blockchain}${more > 0 ? ` (${more} more; use --limit or --json)` : ""}`,
-        );
+        print(`\n${tokens.length} tokens on ${blockchain}`);
       }),
     );
+}
 
-  program
+function registerTokenSubcommand(group: Command, surface: Surface): void {
+  group
     .command("token <chain> <symbolOrAddress>")
-    .description("One token by symbol or address, including decimals")
+    .description("One token by symbol or address, with a custom-token fallback")
     .addHelpText(
       "after",
-      "\nExamples:\n  $ rango token ETH USDC\n  $ rango token BSC 0x55d398326f99059ff775485246999027b3197955",
+      `\nExamples:\n  $ rango ${surface} token ETH USDC\n  $ rango ${surface} token BSC 0x55d398326f99059ff775485246999027b3197955`,
     )
     .action(
       action(async (chain: string, symbolOrAddress: string) => {
@@ -79,9 +70,9 @@ Examples:
         const asset = parseAsset(
           isAddress ? `${blockchain}--${symbolOrAddress}` : `${blockchain}.${symbolOrAddress}`,
         );
-        let token = findToken(await fetchTokens(blockchain), asset);
+        let token = findToken(await fetchTokens(blockchain, surface), asset);
         if (!token && asset.address) {
-          const custom = await api.get<CustomTokenResponse>("/basic/meta/custom-token", {
+          const custom = await api.get<CustomTokenResponse>(customTokenPath(surface), {
             params: { blockchain, address: asset.address },
           });
           token = custom.token ?? undefined;
@@ -89,7 +80,7 @@ Examples:
         if (!token) {
           throw invalidArgs(
             `Token "${symbolOrAddress}" not found on ${blockchain}`,
-            `Try: rango tokens ${blockchain} --search ${symbolOrAddress}`,
+            `Try: rango ${surface} meta --blockchains ${blockchain}`,
           );
         }
         if (isJsonMode()) return printJson(token);
@@ -112,4 +103,9 @@ Examples:
         );
       }),
     );
+}
+
+export function registerSurfaceTokenCommands(group: Command, surface: Surface): void {
+  registerTokensSubcommand(group, surface);
+  registerTokenSubcommand(group, surface);
 }

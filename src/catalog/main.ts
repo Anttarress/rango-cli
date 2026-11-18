@@ -265,16 +265,6 @@ export const mainOperations = [
   }),
   defineOperation({
     surface: "main",
-    name: "wallet-details",
-    summary: "All balances for wallets across blockchains",
-    description:
-      'Addresses are CHAIN.ADDRESS, e.g. ["ETH.0x…","BSC.0x…"]. Returns {wallets:[{blockChain, address, balances}]}.',
-    readOnly: true,
-    input: z.object({ addresses: z.array(z.string()).min(1).describe('["ETH.0x…","BSC.0x…"]') }),
-    request: (input) => ({ method: "GET", path: "/wallets/details", params: { address: input.addresses } }),
-  }),
-  defineOperation({
-    surface: "main",
     name: "token-balance",
     summary: "One token's balance for a wallet",
     description: "Omit address for the native coin.",

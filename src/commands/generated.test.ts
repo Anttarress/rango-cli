@@ -114,73 +114,29 @@ describe("generated commands", () => {
     expect(schema.input.properties.selectedWallets.type).toBe("object");
     const two = JSON.parse((await run(["schema", "basic", "quote"])).stdout);
     expect(two.tool).toBe("basic_quote");
+    expect(two.output.contentType).toBe("application/json");
+    expect(typeof two.output.description).toBe("string");
+    const swapSchema = JSON.parse((await run(["schema", "basic", "swap"])).stdout);
+    expect(swapSchema.output.description).toMatch(/^Returns /);
     expect((await run(["schema", "nope"])).code).toBe(2);
     const map = JSON.parse((await run(["map"])).stdout);
-    expect(map.surfaces.basic).toHaveLength(13);
-    expect(map.surfaces.main).toHaveLength(16);
-    expect(map.curated.some((c: { command: string }) => c.command === "rango quote")).toBe(true);
+    expect(map.surfaces.basic).toHaveLength(15); // 13 catalog ops + token + tokens
+    expect(map.surfaces.main).toHaveLength(17); // 15 catalog ops + token + tokens
+    expect(map.curated.some((c: { command: string }) => c.command === "rango auth")).toBe(true);
+    expect(map.surfaces.basic.some((o: { command: string }) => o.command === "rango basic token")).toBe(true);
   });
 
-  it("route renders the multi-step table", async () => {
-    const calls = mockFetch({
-      "/routing/best": {
-        requestId: "r-1",
-        result: {
-          resultType: "OK",
-          outputAmount: "99500000",
-          swaps: [
-            {
-              swapperId: "Uniswap",
-              from: { symbol: "USDC", blockchain: "ETH", decimals: 6 },
-              to: { symbol: "ETH", blockchain: "ETH", decimals: 18 },
-              toAmount: "40000000000000000",
-              estimatedTimeInSeconds: 30,
-            },
-            {
-              swapperId: "Across",
-              from: { symbol: "ETH", blockchain: "ETH", decimals: 18 },
-              to: { symbol: "USDC", blockchain: "ARBITRUM", decimals: 6 },
-              toAmount: "99500000",
-              estimatedTimeInSeconds: 90,
-            },
-          ],
-        },
-        diagnosisMessages: ["Fees are high right now"],
-      },
-    });
-    const r = await run(
-      [
-        "route",
-        "--from-chain",
-        "eth",
-        "--from-token",
-        "usdc",
-        "--to-chain",
-        "arbitrum",
-        "--to-token",
-        "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
-        "--amount",
-        "100",
-        "--wallets",
-        '{"ETH":"0x1"}',
-      ],
-      { tty: true },
-    );
-    expect(r.code).toBe(0);
-    const body = JSON.parse(String(calls[0]?.init.body));
-    expect(body.from).toEqual({ blockchain: "ETH", symbol: "USDC" });
-    expect(body.to).toEqual({
-      blockchain: "ARBITRUM",
-      address: "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
-    });
-    expect(r.stdout).toMatch(/Steps +2/);
-    expect(r.stdout).toMatch(/You receive +99\.5 USDC/);
-    expect(r.stdout).toMatch(/~2 min/);
-    expect(r.stdout).toMatch(/Across/);
-    expect(r.stdout).toMatch(/Note: Fees are high/);
-    mockFetch({ "/routing/best": { requestId: "r", result: null, error: "no route" } });
-    expect(
-      (await run(["route", "--from-chain", "ETH", "--to-chain", "BSC", "--amount", "1"], { tty: true })).code,
-    ).toBe(4);
+  it("every generated command shows an example and accepts `help` on leaves", async () => {
+    const leaf = await run(["basic", "quote", "help"]);
+    expect(leaf.code).toBe(0);
+    expect(leaf.stdout).toMatch(/Example:/);
+    expect(leaf.stdout).toMatch(/rango basic quote --from/);
+    const dashHelp = await run(["main", "create-tx", "--help"]);
+    expect(dashHelp.stdout).toMatch(/Example:/);
+    expect(dashHelp.stdout).toMatch(/rango main create-tx --request-id/);
+    const group = await run(["basic", "help"]);
+    expect(group.code).toBe(0);
+    expect(group.stdout).toMatch(/\bquote\b/);
+    expect((await run(["map", "help"])).stdout).toMatch(/Examples:/);
   });
 });

@@ -6,12 +6,15 @@ import { action } from "../core/command.js";
 import { invalidArgs } from "../core/errors.js";
 import { invoke } from "../core/invoke.js";
 import { isJsonMode, jsonOutput, print, printJson } from "../core/output.js";
+import { registerSurfaceTokenCommands } from "./tokens.js";
 
 /**
  * `rango basic <op>` and `rango main <op>`: one subcommand per catalogue
- * entry, flags derived from its zod schema. This is the raw layer; the
- * curated commands (quote, swap, status, …) sit on top with friendlier flags
- * and tables.
+ * entry, flags derived from its zod schema. This is the whole surface area
+ * of the API; the top-level (`rango agent`, `rango api`, `rango auth`,
+ * `rango mcp`, `rango map`, `rango schema`) is only infrastructure around it.
+ * `basic token`, `basic tokens`, `main token`, `main tokens` are the
+ * non-generated conveniences registered on the two surface groups.
  */
 
 const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
@@ -62,6 +65,49 @@ function parseList(value: string, previous: string[] | undefined): string[] {
   return [...(previous ?? []), ...parts];
 }
 
+/**
+ * Pick a plausible example value for a schema field so each generated command
+ * can show one real-looking invocation under `--help`. Names, not types, drive
+ * the mapping: `fromBlockchain`, `requestId`, `amount`, etc. Unknown types fall
+ * back to `<value>`.
+ */
+function exampleValue(name: string, schema: z.ZodTypeAny): string {
+  const { inner } = unwrap(schema);
+  if (inner instanceof z.ZodEnum) return (inner.options as string[])[0] ?? "VALUE";
+  if (inner instanceof z.ZodBoolean) return "";
+  const n = name.toLowerCase();
+  if (n === "from" || n === "to") return n === "from" ? "BSC.BNB" : "ETH.ETH";
+  if (n === "amount" || n.endsWith("amount")) return "1";
+  if (n === "slippage") return "0.5";
+  if (n === "step") return "1";
+  if (n === "requestid") return "<requestId>";
+  if (n === "txid") return "0xhash";
+  if (n.endsWith("address") || n === "walletaddress") return "0xYOU";
+  if (n.includes("blockchain") || n === "chain") return "ETH";
+  if (n === "symbol" || n.endsWith("symbol")) return "USDC";
+  if (n === "blockchains") return "ETH,BSC";
+  if (n === "addresses") return '["ETH.0xYOU","BSC.0xYOU"]';
+  if (n === "swappers") return "1inch,paraswap";
+  if (inner instanceof z.ZodArray) return "a,b";
+  if (inner instanceof z.ZodObject || inner instanceof z.ZodRecord) return '{"ETH":"0xYOU"}';
+  if (inner instanceof z.ZodNumber) return "1";
+  return "<value>";
+}
+
+/** One example invocation for an operation, built from its required fields. */
+function exampleFor(op: Operation): string {
+  const parts = [`rango ${op.surface} ${op.name}`];
+  for (const [name, schema] of Object.entries(op.input.shape)) {
+    const { optional } = unwrap(schema as z.ZodTypeAny);
+    if (optional) continue;
+    const kebabName = kebab(name);
+    const value = exampleValue(name, schema as z.ZodTypeAny);
+    if (value === "") parts.push(`--${kebabName}`);
+    else parts.push(`--${kebabName} ${value.includes(" ") ? `"${value}"` : value}`);
+  }
+  return parts.join(" ");
+}
+
 /** Build the commander options for one schema field. Booleans get --x and --no-x. */
 export function optionsFor(name: string, schema: z.ZodTypeAny): Option[] {
   const { inner, optional } = unwrap(schema);
@@ -104,13 +150,14 @@ export function inputFrom(opts: Record<string, unknown>): Record<string, unknown
 export function registerGeneratedCommands(program: Command): void {
   for (const surface of SURFACES) {
     const group = program.command(surface.name).description(surface.help);
+    registerSurfaceTokenCommands(group, surface.name);
     for (const op of operations.filter((o) => o.surface === surface.name)) {
       const cmd = group
         .command(op.name)
         .description(op.summary)
         .addHelpText(
           "after",
-          `\n${op.description}\n\nMCP tool: ${toolName(op)}${op.readOnly ? "" : "\nThis operation builds or records something; it does not sign."}`,
+          `\n${op.description}\n\nExample:\n  $ ${exampleFor(op)}\n\nMCP tool: ${toolName(op)}${op.readOnly ? "" : "\nThis operation builds or records something; it does not sign."}`,
         );
       for (const [name, schema] of Object.entries(op.input.shape)) {
         for (const option of optionsFor(name, schema as z.ZodTypeAny)) cmd.addOption(option);
@@ -130,6 +177,10 @@ export function registerGeneratedCommands(program: Command): void {
     .description(
       'JSON schema of one operation, e.g. "rango schema basic quote" or "rango schema main_best_route"',
     )
+    .addHelpText(
+      "after",
+      "\nExamples:\n  $ rango schema basic quote\n  $ rango schema main_best_route\n  $ rango schema main confirm-route",
+    )
     .action(
       action(async (ref: string, name?: string) => {
         const op = findOperation(ref, name);
@@ -145,13 +196,17 @@ export function registerGeneratedCommands(program: Command): void {
           description: op.description,
           readOnly: op.readOnly,
           input: jsonSchemaFor(op),
+          output: outputFor(op),
         });
       }),
     );
 
   program
     .command("map")
-    .description("Every command and MCP tool in one listing")
+    .description(
+      "List every rango command and its matching MCP tool. Prints a tree on a terminal, JSON when piped or with --json.",
+    )
+    .addHelpText("after", "\nExamples:\n  $ rango map\n  $ rango map --json | jq '.surfaces.basic[].command'")
     .action(
       action(async () => {
         const curated = program.commands
@@ -161,16 +216,35 @@ export function registerGeneratedCommands(program: Command): void {
           )
           .map((c) => ({ command: `rango ${c.name()}`, summary: c.description() }))
           .sort((a, b) => a.command.localeCompare(b.command));
-        const surfaces: Record<string, unknown[]> = {};
-        for (const op of operations) {
-          const bucket = surfaces[op.surface] ?? [];
-          surfaces[op.surface] = bucket;
-          bucket.push({
-            command: `rango ${op.surface} ${op.name}`,
-            tool: toolName(op),
-            summary: op.summary,
-            readOnly: op.readOnly,
-          });
+        interface SurfaceEntry {
+          command: string;
+          tool?: string;
+          summary: string;
+          readOnly: boolean;
+        }
+        const surfaces: Record<string, SurfaceEntry[]> = {};
+        for (const s of SURFACES) {
+          const bucket: SurfaceEntry[] = [];
+          for (const op of operations.filter((o) => o.surface === s.name)) {
+            bucket.push({
+              command: `rango ${op.surface} ${op.name}`,
+              tool: toolName(op),
+              summary: op.summary,
+              readOnly: op.readOnly,
+            });
+          }
+          const group = program.commands.find((c) => c.name() === s.name);
+          for (const sub of group?.commands ?? []) {
+            const name = sub.name();
+            if (name === "help") continue;
+            if (bucket.some((e) => e.command === `rango ${s.name} ${name}`)) continue;
+            bucket.push({
+              command: `rango ${s.name} ${name}`,
+              summary: sub.description(),
+              readOnly: true,
+            });
+          }
+          surfaces[s.name] = bucket;
         }
         const tree = { curated, surfaces };
         if (isJsonMode()) return printJson(tree);
@@ -178,13 +252,32 @@ export function registerGeneratedCommands(program: Command): void {
         for (const c of curated) lines.push(`  ${c.command.slice(6).padEnd(30)} ${c.summary}`);
         for (const s of SURFACES) {
           lines.push(`  ${s.name}`);
-          for (const op of operations.filter((o) => o.surface === s.name)) {
-            lines.push(`    ${op.name.padEnd(28)} ${op.summary}${op.readOnly ? "" : "  [writes]"}`);
+          for (const entry of surfaces[s.name] ?? []) {
+            const name = entry.command.replace(`rango ${s.name} `, "");
+            lines.push(`    ${name.padEnd(28)} ${entry.summary}${entry.readOnly ? "" : "  [writes]"}`);
           }
         }
         print(lines.join("\n"));
       }),
     );
+}
+
+/**
+ * A short, best-effort description of what the operation returns. The catalogue
+ * descriptions already follow the convention "Returns X, Y, Z." — we lift those
+ * sentences out so `rango schema` can emit an `output` field without duplicating
+ * copy. Falls back to a generic note if nothing matches.
+ */
+export function outputFor(op: Operation): { description: string; contentType: string } {
+  const sentences = (op.description || "").split(/(?<=[.!?])\s+/);
+  const returns = sentences
+    .filter((s) => /^Returns\b/i.test(s))
+    .join(" ")
+    .trim();
+  return {
+    description: returns || "See the Rango API docs for the response shape of this endpoint.",
+    contentType: "application/json",
+  };
 }
 
 /** zod 3 has no built-in JSON Schema export; describe the shape well enough for an agent. */

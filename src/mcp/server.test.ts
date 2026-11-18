@@ -27,7 +27,7 @@ describe("mcp server", () => {
   it("exposes every catalogue operation as a tool with annotations", async () => {
     const { client, server } = await connected();
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(29);
+    expect(tools).toHaveLength(28);
     const names = tools.map((t) => t.name);
     expect(names).toContain("basic_quote");
     expect(names).toContain("main_best_route");
