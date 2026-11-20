@@ -133,7 +133,7 @@ export const basicOperations = [
       "status is running, success or failed. output says what arrived, including a substitute token when a bridge had to fall back. Poll every 10 to 30 seconds.",
     readOnly: true,
     input: z.object({
-      requestId: str("requestId from quote or swap"),
+      requestId: str("requestId returned by the swap call whose transaction was signed"),
       txId: str("Hash of the signed main transaction"),
     }),
     request: (input) => ({ method: "GET", path: "/basic/status", params: input }),

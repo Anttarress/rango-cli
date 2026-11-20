@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { vi } from "vitest";
+import { z } from "zod";
 import { createProgram, normalizeHelpArg } from "../bin/rango.js";
 
 export class ExitSignal extends Error {
@@ -46,6 +47,27 @@ export function mockFetch(routes: Record<string, Handler | Response | unknown>):
     }),
   );
   return calls;
+}
+
+/** The skill the tests install: a file an agent loads, and one it links to. */
+export const SKILL_FILES: Record<string, string> = {
+  "SKILL.md": "---\nname: rango\ndescription: for tests\n---\nthe skill\n",
+  "references/REFERENCE.md": "the reference\n",
+};
+
+/**
+ * Serve a skills repository the way `rango agent setup` downloads one: the
+ * index, and beside it each file of the one skill, "rango". `entry` replaces
+ * what the index says about that skill.
+ */
+export function publishSkills(files: Record<string, string> = SKILL_FILES, entry: object = {}): Call[] {
+  const routes: Record<string, unknown> = {
+    "/skills/index.json": {
+      skills: [{ name: "rango", description: "d", files: Object.keys(files), ...entry }],
+    },
+  };
+  for (const [path, body] of Object.entries(files)) routes[`/skills/rango/${path}`] = new Response(body);
+  return mockFetch(routes);
 }
 
 export interface RunResult {
@@ -100,6 +122,27 @@ export async function run(args: string[], opts: { tty?: boolean } = {}): Promise
     process.exitCode = undefined;
   }
   return { code, stdout: out.join("\n"), stderr: err.join("\n") };
+}
+
+/**
+ * A value of the right kind for a required field, so an operation's request
+ * can be built: a string is its own name in braces, as the API reference
+ * writes a path parameter.
+ */
+export function sample(schema: z.ZodTypeAny, name: string): unknown {
+  if (schema instanceof z.ZodOptional || schema instanceof z.ZodDefault) return undefined;
+  if (schema instanceof z.ZodString) return `{${name}}`;
+  if (schema instanceof z.ZodNumber) return 1;
+  if (schema instanceof z.ZodEnum) return schema.options[0];
+  if (schema instanceof z.ZodArray) return [sample(schema.element, name)];
+  if (schema instanceof z.ZodObject) {
+    const fields = Object.entries(schema.shape as z.ZodRawShape).map(([key, field]) => [
+      key,
+      sample(field, key),
+    ]);
+    return Object.fromEntries(fields.filter(([, value]) => value !== undefined));
+  }
+  return undefined;
 }
 
 export const EVM = "^0x[a-fA-F0-9]{40}$";

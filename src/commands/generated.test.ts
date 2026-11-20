@@ -104,21 +104,10 @@ describe("generated commands", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("basic chains prints JSON and schema/map describe the catalogue", async () => {
+  it("basic chains prints JSON and map describes the catalogue", async () => {
     mockFetch({ "/basic/meta/blockchains": BLOCKCHAINS });
     const r = await run(["basic", "chains"]);
     expect(JSON.parse(r.stdout)).toHaveLength(3);
-    const schema = JSON.parse((await run(["schema", "main_best_route"])).stdout);
-    expect(schema.command).toBe("rango main best-route");
-    expect(schema.input.required).toEqual(["fromBlockchain", "toBlockchain", "amount"]);
-    expect(schema.input.properties.selectedWallets.type).toBe("object");
-    const two = JSON.parse((await run(["schema", "basic", "quote"])).stdout);
-    expect(two.tool).toBe("basic_quote");
-    expect(two.output.contentType).toBe("application/json");
-    expect(typeof two.output.description).toBe("string");
-    const swapSchema = JSON.parse((await run(["schema", "basic", "swap"])).stdout);
-    expect(swapSchema.output.description).toMatch(/^Returns /);
-    expect((await run(["schema", "nope"])).code).toBe(2);
     const map = JSON.parse((await run(["map"])).stdout);
     expect(map.surfaces.basic).toHaveLength(15); // 13 catalog ops + token + tokens
     expect(map.surfaces.main).toHaveLength(17); // 15 catalog ops + token + tokens

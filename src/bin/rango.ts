@@ -4,6 +4,7 @@ import { registerApiCommand } from "../commands/api.js";
 import { registerAuthCommand } from "../commands/auth.js";
 import { registerGeneratedCommands } from "../commands/generated.js";
 import { registerMcpCommand } from "../commands/mcp.js";
+import { registerSchemaCommand } from "../commands/schema.js";
 import { setOverrides } from "../core/config.js";
 import { CLI_NAME, DISCORD_URL, DOCS_URL, REPO_URL, VERSION } from "../core/constants.js";
 import { handleError } from "../core/errors.js";
@@ -16,13 +17,14 @@ Agent guidance:
   4 API error (no route, limits, server), 5 network error, 1 anything else.
   Set RANGO_API_KEY, pass --api-key, or run "rango auth set <key>"; "rango auth test" checks it.
   Every API operation is a subcommand of "rango basic <op>" or "rango main <op>"; "rango map" lists them,
-  "rango schema <surface> <op>" prints the input schema. "rango api <path>" reaches anything else.
+  "rango schema <surface> <op>" lists the fields one takes and returns. "rango api <path>" reaches
+  anything else.
   Assets are BLOCKCHAIN.SYMBOL or BLOCKCHAIN.SYMBOL--ADDRESS; chain names come from "rango basic chains",
-  token details from "rango token <chain> <symbol>". Basic takes smallest-unit integer amounts;
+  token details from "rango basic token <chain> <symbol>". Basic takes smallest-unit integer amounts;
   Main takes human-readable decimal amounts. Mixing them is the most common mistake.
   Nothing here signs or sends a transaction: "rango basic swap" and "rango main create-tx" return
-  calldata for a wallet. "rango mcp" serves the same operations as MCP tools; "rango agent setup"
-  wires them into Claude Code, Cursor or Codex.
+  calldata for a wallet. The same operations are MCP tools: "rango agent setup" connects Claude Code,
+  Cursor or Codex to the Rango MCP server, and "rango mcp" runs that server on this machine.
 
 Docs: ${DOCS_URL}   Keys: ${DISCORD_URL}   Source: ${REPO_URL}`;
 
@@ -57,6 +59,7 @@ export function createProgram(): Command {
   registerMcpCommand(program);
   registerAgentCommand(program);
   registerGeneratedCommands(program);
+  registerSchemaCommand(program);
 
   return program;
 }

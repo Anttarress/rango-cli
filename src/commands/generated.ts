@@ -1,9 +1,8 @@
 import { type Command, InvalidArgumentError, Option } from "commander";
 import { z } from "zod";
-import { findOperation, operations, SURFACES, toolName } from "../catalog/index.js";
+import { operations, SURFACES, toolName } from "../catalog/index.js";
 import type { Operation } from "../catalog/types.js";
 import { action } from "../core/command.js";
-import { invalidArgs } from "../core/errors.js";
 import { invoke } from "../core/invoke.js";
 import { isJsonMode, jsonOutput, print, printJson } from "../core/output.js";
 import { registerSurfaceTokenCommands } from "./tokens.js";
@@ -25,7 +24,7 @@ interface Unwrapped {
   defaultValue: unknown;
 }
 
-function unwrap(schema: z.ZodTypeAny): Unwrapped {
+export function unwrap(schema: z.ZodTypeAny): Unwrapped {
   let inner = schema;
   let optional = false;
   let defaultValue: unknown;
@@ -173,35 +172,6 @@ export function registerGeneratedCommands(program: Command): void {
   }
 
   program
-    .command("schema <operation> [name]")
-    .description(
-      'JSON schema of one operation, e.g. "rango schema basic quote" or "rango schema main_best_route"',
-    )
-    .addHelpText(
-      "after",
-      "\nExamples:\n  $ rango schema basic quote\n  $ rango schema main_best_route\n  $ rango schema main confirm-route",
-    )
-    .action(
-      action(async (ref: string, name?: string) => {
-        const op = findOperation(ref, name);
-        if (!op)
-          throw invalidArgs(
-            `Unknown operation "${name ? `${ref} ${name}` : ref}"`,
-            "List them with: rango map",
-          );
-        printJson({
-          command: `rango ${op.surface} ${op.name}`,
-          tool: toolName(op),
-          summary: op.summary,
-          description: op.description,
-          readOnly: op.readOnly,
-          input: jsonSchemaFor(op),
-          output: outputFor(op),
-        });
-      }),
-    );
-
-  program
     .command("map")
     .description(
       "List every rango command and its matching MCP tool. Prints a tree on a terminal, JSON when piped or with --json.",
@@ -260,45 +230,4 @@ export function registerGeneratedCommands(program: Command): void {
         print(lines.join("\n"));
       }),
     );
-}
-
-/**
- * A short, best-effort description of what the operation returns. The catalogue
- * descriptions already follow the convention "Returns X, Y, Z." — we lift those
- * sentences out so `rango schema` can emit an `output` field without duplicating
- * copy. Falls back to a generic note if nothing matches.
- */
-export function outputFor(op: Operation): { description: string; contentType: string } {
-  const sentences = (op.description || "").split(/(?<=[.!?])\s+/);
-  const returns = sentences
-    .filter((s) => /^Returns\b/i.test(s))
-    .join(" ")
-    .trim();
-  return {
-    description: returns || "See the Rango API docs for the response shape of this endpoint.",
-    contentType: "application/json",
-  };
-}
-
-/** zod 3 has no built-in JSON Schema export; describe the shape well enough for an agent. */
-export function jsonSchemaFor(op: Operation): unknown {
-  const properties: Record<string, unknown> = {};
-  const required: string[] = [];
-  for (const [name, schema] of Object.entries(op.input.shape)) {
-    const { inner, optional } = unwrap(schema as z.ZodTypeAny);
-    let type = "string";
-    let extra: Record<string, unknown> = {};
-    if (inner instanceof z.ZodNumber) type = "number";
-    else if (inner instanceof z.ZodBoolean) type = "boolean";
-    else if (inner instanceof z.ZodArray) {
-      type = "array";
-      extra = {
-        items: unwrap(inner.element).inner instanceof z.ZodString ? { type: "string" } : { type: "object" },
-      };
-    } else if (inner instanceof z.ZodEnum) extra = { enum: inner.options };
-    else if (inner instanceof z.ZodObject || inner instanceof z.ZodRecord) type = "object";
-    properties[name] = { type, ...extra, description: (schema as z.ZodTypeAny).description ?? "" };
-    if (!optional) required.push(name);
-  }
-  return { type: "object", properties, required };
 }

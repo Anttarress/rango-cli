@@ -47,6 +47,7 @@
     "format": "biome format --write src/",
     "test": "vitest run",
     "test:watch": "vitest",
+    "sync:openapi": "node scripts/sync-openapi.mjs",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm build"
   },

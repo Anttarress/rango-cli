@@ -59,6 +59,41 @@ export function printJson(data: unknown): void {
   console.log(jsonOutput(data));
 }
 
+const isPlain = (value: unknown): boolean =>
+  value === null ||
+  typeof value !== "object" ||
+  (Array.isArray(value) && value.every((item) => item === null || typeof item !== "object"));
+
+/** No object inside it holds another one. */
+const isShallow = (value: unknown): boolean =>
+  isPlain(value) || (!Array.isArray(value) && Object.values(value as object).every(isPlain));
+
+/**
+ * JSON that keeps an object on one line until something inside it nests twice.
+ * A schema then reads a field per line, `"amount": { "type": "string", … }`,
+ * in a third of the lines JSON.stringify gives it.
+ */
+export function tidyJson(value: unknown, indent = ""): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  const inside = `${indent}  `;
+  if (Array.isArray(value)) {
+    if (isPlain(value)) return `[${value.map((item) => tidyJson(item)).join(", ")}]`;
+    return `[\n${value.map((item) => inside + tidyJson(item, inside)).join(",\n")}\n${indent}]`;
+  }
+  const entries = Object.entries(value).filter(([, item]) => item !== undefined);
+  if (entries.length === 0) return "{}";
+  if (entries.every(([, item]) => isShallow(item))) {
+    return `{ ${entries.map(([key, item]) => `${JSON.stringify(key)}: ${tidyJson(item)}`).join(", ")} }`;
+  }
+  const lines = entries.map(([key, item]) => `${inside}${JSON.stringify(key)}: ${tidyJson(item, inside)}`);
+  return `{\n${lines.join(",\n")}\n${indent}}`;
+}
+
+/** printJson for a schema: tidy, and still one line with --compact. */
+export function printTidyJson(data: unknown): void {
+  console.log(state.compact ? JSON.stringify(data) : tidyJson(data));
+}
+
 export function print(text: string): void {
   console.log(text);
 }
