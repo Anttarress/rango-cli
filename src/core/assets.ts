@@ -78,7 +78,7 @@ export async function resolveAmount(amount: string, asset: string): Promise<stri
   if (!token || typeof token.decimals !== "number") {
     throw invalidArgs(
       `Token ${asset} not found in Rango's list, so "${amount}" cannot be converted`,
-      "Pass the amount in the token's smallest unit instead, or check the asset with: rango token <chain> <symbol>",
+      "Pass the amount in the token's smallest unit instead, or check the asset with: rango basic token <chain> <symbol>",
     );
   }
   try {

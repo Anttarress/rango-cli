@@ -10,13 +10,13 @@ export function registerMcpCommand(program: Command): void {
   program
     .command("mcp")
     .description(
-      "Serve the Rango API as MCP tools over stdio, for Claude Code, Cursor, Codex and other agents",
+      "Run the Rango MCP server on this machine (stdio), for Claude Code, Cursor, Codex and other agents",
     )
     .addHelpText(
       "after",
       `
 The key comes from RANGO_API_KEY, the config file (rango auth set) or --api-key, as for every command.
-Configure it in one step with: rango agent setup
+Connect your agents in one step with: rango agent setup
 
 Manual config (any MCP client):
   { "mcpServers": { "rango": { "command": "rango", "args": ["mcp"] } } }`,

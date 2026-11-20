@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "17 5 * * *" # daily: the skills change in their own repository, without a push here
 
 jobs:
   check:
@@ -13,6 +15,11 @@ jobs:
         node: [20, 22]
     steps:
       - uses: actions/checkout@v4
+      - name: Check out the skills, to test what they name against this CLI
+        uses: actions/checkout@v4
+        with:
+          repository: Anttarress/rango-skills
+          path: rango-skills
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -22,6 +29,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+        env:
+          RANGO_SKILLS_DIR: ${{ github.workspace }}/rango-skills/skills
       - run: pnpm build
       - name: Smoke-test the built binary
         run: node dist/rango.js --help && node dist/rango.js --version

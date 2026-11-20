@@ -8,6 +8,22 @@ export const ENV_API_URL = "RANGO_API_URL";
 
 export const REQUEST_TIMEOUT_MS = 30_000;
 
+/**
+ * Rango's hosted MCP server. Empty until it is live: while it is empty,
+ * `rango agent setup` registers the server this CLI runs on the user's machine
+ * (`rango mcp`). Put the URL here at launch and hosted becomes the default.
+ */
+export const HOSTED_MCP_URL: string = "";
+
+/**
+ * The GitHub repository the Rango skills live in, and the index of them in it.
+ * It is the only copy: `rango agent setup` downloads the skills from here each
+ * time it runs, and `npx skills add <SKILLS_REPO>` installs the same files. A
+ * move of that repository means changing this line and releasing.
+ */
+export const SKILLS_REPO = "Anttarress/rango-skills";
+export const SKILLS_INDEX_URL = `https://raw.githubusercontent.com/${SKILLS_REPO}/main/skills/index.json`;
+
 export const DOCS_URL = "https://docs.rango.exchange";
 export const DISCORD_URL = "https://discord.gg/q3EngGyTrZ";
 export const REPO_URL = "https://github.com/Anttarress/rango-cli";

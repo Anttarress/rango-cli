@@ -77,7 +77,7 @@ export function getApiKey(): string | undefined {
   return resolveApiKey()?.key;
 }
 
-function isLoopback(url: URL): boolean {
+export function isLoopback(url: URL): boolean {
   return url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
 }
 

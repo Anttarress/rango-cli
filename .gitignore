@@ -4,3 +4,9 @@ dist/
 .DS_Store
 .env
 coverage/
+
+# Skills installed into this folder by `rango agent setup --scope local`
+.agents/skills/
+.claude/skills/
+.codex/skills/
+.cursor/skills/
